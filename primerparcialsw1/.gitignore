@@ -1,0 +1,44 @@
+# Node.js
+node_modules/
+.env
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Next.js
+.next/
+out/
+
+# VSCode
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# IDE
+.idea/
+*.iml
+
+# Build
+/dist/
+
+# Misc
+*.swp
+*.swo
+
+# Frontend
+Frontend/umldiagram/node_modules/
+Frontend/umldiagram/.next/
+Frontend/umldiagram/out/
+
+# Backend
+Backend/backend/node_modules/
+
+# Others
+*.bak
+*.tmp

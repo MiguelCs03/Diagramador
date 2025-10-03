@@ -1,0 +1,22 @@
+[build]
+  command = "pnpm build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Si más adelante decides usar rutas relativas "/api" y "/ws" en el frontend,
+# puedes activar estos redirects como proxy hacia tu backend:
+# [[redirects]]
+#   from = "/api/*"
+#   to = "https://tu-backend.onrender.com/api/:splat"
+#   status = 200
+#   force = true
+#
+# [[redirects]]
+#   from = "/ws"
+#   to = "wss://tu-backend.onrender.com/ws"
+#   status = 200
