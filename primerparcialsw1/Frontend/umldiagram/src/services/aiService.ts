@@ -253,7 +253,9 @@ IMPORTANTE: Responde SOLO con JSON válido en este formato:
         "id": "existing_entity_id",
         "changes": {
           "newAttributes": [{"name": "attr", "type": "String", "visibility": "private"}],
-          "newMethods": [{"name": "method", "returnType": "void", "parameters": [], "visibility": "public"}]
+          "newMethods": [{"name": "method", "returnType": "void", "parameters": [], "visibility": "public"}],
+          "deletedAttributes": ["attribute_name_to_delete"],
+          "deletedMethods": ["method_name_to_delete"]
         }
       }
     ],
@@ -268,13 +270,19 @@ IMPORTANTE: Responde SOLO con JSON válido en este formato:
       }
     ],
     "deletedEntities": ["entity_name_to_delete"],
-    "deletedRelations": ["relation_id_to_delete"]
+    "deletedRelations": ["relation_id_to_delete", "entre Cliente y Factura"]
   }
 }
 
 Para comandos ADD: crear nuevas entidades/relaciones
 Para comandos MODIFY: actualizar entidades existentes
-Para comandos DELETE: eliminar entidades/relaciones
+Para comandos DELETE: eliminar entidades/relaciones/atributos/métodos específicos
+
+IMPORTANTE para eliminar elementos específicos:
+- Para eliminar atributo: usar "deletedAttributes" en modifiedEntities con el nombre del atributo
+- Para eliminar método: usar "deletedMethods" en modifiedEntities con el nombre del método  
+- Para eliminar relación: usar "deletedRelations" con el ID de la relación o descripción "entre EntityA y EntityB"
+- Para eliminar entidad completa: usar "deletedEntities"
 
 Mantén las modificaciones mínimas y enfocadas solo a lo que pidió el usuario.`;
 
@@ -398,6 +406,20 @@ Mantén las modificaciones mínimas y enfocadas solo a lo que pidió el usuario.
             }));
             entity.methods.push(...newMethods);
           }
+          
+          // Eliminar atributos específicos
+          if (modification.changes.deletedAttributes) {
+            entity.attributes = entity.attributes.filter((attr: any) => 
+              !modification.changes.deletedAttributes.includes(attr.name)
+            );
+          }
+          
+          // Eliminar métodos específicos
+          if (modification.changes.deletedMethods) {
+            entity.methods = entity.methods.filter((method: any) => 
+              !modification.changes.deletedMethods.includes(method.name)
+            );
+          }
         }
       }
     }
@@ -433,9 +455,33 @@ Mantén las modificaciones mínimas y enfocadas solo a lo que pidió el usuario.
 
     // Eliminar relaciones
     if (changes.deletedRelations) {
-      updated.relations = updated.relations.filter((r: UMLRelation) => 
-        !changes.deletedRelations.includes(r.id)
-      );
+      updated.relations = updated.relations.filter((r: UMLRelation) => {
+        // Verificar eliminación por ID
+        if (changes.deletedRelations.includes(r.id)) {
+          return false;
+        }
+        
+        // Verificar eliminación por descripción (ej: "entre Cliente y Factura")
+        for (const deletionDesc of changes.deletedRelations) {
+          if (typeof deletionDesc === 'string' && deletionDesc.includes('entre')) {
+            const matches = deletionDesc.match(/entre\s+(\w+)\s+y\s+(\w+)/i);
+            if (matches) {
+              const [, entity1, entity2] = matches;
+              const sourceEntity = updated.entities.find((e: UMLEntity) => e.name === entity1 || e.id === entity1);
+              const targetEntity = updated.entities.find((e: UMLEntity) => e.name === entity2 || e.id === entity2);
+              
+              if (sourceEntity && targetEntity) {
+                if ((r.source === sourceEntity.id && r.target === targetEntity.id) ||
+                    (r.source === targetEntity.id && r.target === sourceEntity.id)) {
+                  return false;
+                }
+              }
+            }
+          }
+        }
+        
+        return true;
+      });
     }
 
     // Actualizar metadata
