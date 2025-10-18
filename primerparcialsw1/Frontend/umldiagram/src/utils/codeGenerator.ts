@@ -1,9 +1,10 @@
 import type { UMLDiagram, UMLEntity, UMLRelation, UMLAttribute } from '../types/uml';
 
+// 1. TIPO 'CONFIG' AÑADIDO A LA INTERFAZ
 interface GeneratedFile {
   filename: string;
   content: string;
-  type: 'entity' | 'repository' | 'service' | 'controller' | 'dto';
+  type: 'entity' | 'repository' | 'service' | 'controller' | 'dto' | 'config';
 }
 
 export class SpringBootCodeGenerator {
@@ -31,6 +32,10 @@ export class SpringBootCodeGenerator {
       files.push(this.generateController(entity));
       files.push(this.generateDTO(entity));
     });
+
+    // 2. LLAMADA AL NUEVO MÉTODO PARA GENERAR EL ARCHIVO CORS GLOBAL
+    // Esto se ejecuta una vez, no por cada entidad.
+    files.push(this.generateCorsConfig());
 
     return files;
   }
@@ -245,6 +250,7 @@ import java.util.Optional;
 @Transactional
 public class ${className}Service {
     
+    // TODO: Consider changing to Constructor Injection
     @Autowired
     private ${className}Repository ${lowerClassName}Repository;
     
@@ -307,7 +313,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.bind.annotation.RequestMethod;
+// 3. SE ELIMINA LA IMPORTACIÓN DE RequestMethod YA QUE @CrossOrigin FUE REMOVIDO
+// import org.springframework.web.bind.annotation.RequestMethod; 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -319,10 +326,11 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/${pluralName}")
-@CrossOrigin(origins = "*", allowedHeaders = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.PATCH, RequestMethod.OPTIONS})
+// 3. LA ANOTACIÓN @CrossOrigin FUE ELIMINADA DE AQUÍ
 @Tag(name = "${className}", description = "${className} API")
 public class ${className}Controller {
     
+    // TODO: Consider changing to Constructor Injection
     @Autowired
     private ${className}Service ${lowerClassName}Service;
     
@@ -463,6 +471,45 @@ public class ${dtoClassName} {
       filename: `${dtoClassName}.java`,
       content,
       type: 'dto',
+    };
+  }
+
+  // 4. NUEVO MÉTODO AÑADIDO PARA LA CONFIGURACIÓN GLOBAL DE CORS
+  private generateCorsConfig(): GeneratedFile {
+    const content = `package ${this.packageName}.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+public class CorsConfig {
+
+    /**
+     * Configuración CORS global para permitir que el frontend acceda a la API.
+     * Esto reemplaza la anotación @CrossOrigin en los controladores
+     * y previene el error de CGLIB BeanCreationException.
+     */
+    @Bean
+    public WebMvcConfigurer corsConfigurer() {
+        return new WebMvcConfigurer() {
+            @Override
+            public void addCorsMappings(CorsRegistry registry) {
+                registry.addMapping("/**") // Aplica a todos los endpoints
+                        .allowedOrigins("*") // Permite todos los orígenes (ajustar para producción)
+                        .allowedHeaders("*") // Permite todas las cabeceras
+                        .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"); // Métodos permitidos
+            }
+        };
+    }
+}
+`;
+
+    return {
+      filename: `CorsConfig.java`, // Se guardará en la raíz del proyecto, idealmente iría en /config
+      content,
+      type: 'config',
     };
   }
 

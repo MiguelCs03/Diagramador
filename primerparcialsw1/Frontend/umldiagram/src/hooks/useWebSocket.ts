@@ -31,7 +31,7 @@ interface UseWebSocketReturn {
   onClientLeft: (callback: (clientCount: number) => void) => void;
 }
 
-// Detectar automáticamente la URL correcta (KISS) o usar env
+
 const WS_URL = 'wss://diagramadoruml.onrender.com/ws';
 
 console.log('🔍 [WebSocket Debug] URL a usar:', WS_URL);

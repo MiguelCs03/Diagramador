@@ -50,6 +50,9 @@ export class ProjectExporter {
         case 'dto':
           subPath = 'dto';
           break;
+        case 'config':
+          subPath = 'config';
+          break;
       }
 
       files.push({
@@ -70,7 +73,7 @@ export class ProjectExporter {
     // Add README
     files.push(this.generateReadme());
 
-    // Add Docker files
+    // Add Docker files 
     files.push(this.generateDockerfile());
     files.push(this.generateDockerCompose());
 
@@ -141,37 +144,20 @@ ${this.diagram.entities
 
     return {
       path: `src/main/java/${this.packageName.replace(/\./g, '/')}/${className}.java`,
-      content: `package ${this.packageName};
+    content: `package ${this.packageName};
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
-import org.springframework.context.annotation.Bean;
 
 @SpringBootApplication
 @EnableTransactionManagement
 public class ${className} {
 
-    public static void main(String[] args) {
-        SpringApplication.run(${className}.class, args);
-    }
-    
-    @Bean
-    public WebMvcConfigurer corsConfigurer() {
-        return new WebMvcConfigurer() {
-            @Override
-            public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/**")
-            .allowedOrigins("*")
-            .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
-            .allowedHeaders("*")
-            .exposedHeaders("*")
-            .allowCredentials(false);
-            }
-        };
-    }
+  public static void main(String[] args) {
+    SpringApplication.run(${className}.class, args);
+  }
+
 }
 `,
     };
