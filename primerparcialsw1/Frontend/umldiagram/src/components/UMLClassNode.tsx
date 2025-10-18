@@ -105,7 +105,7 @@ const UMLClassNode: React.FC<UMLClassNodeProps> = ({ data, selected }) => {
   };
 
   return (
-    <div className={`bg-white border-2 border-blue-700 rounded-lg shadow-lg min-w-[220px] max-w-[300px] ${selected ? 'ring-2 ring-blue-400' : ''}`}>
+  <div className={`bg-white border-2 border-blue-700 rounded-none shadow-lg min-w-[220px] max-w-[300px] ${selected ? 'ring-2 ring-blue-400' : ''}`}>
       {/* Handles para conexiones */}
       <Handle type="target" position={Position.Top} className="w-3 h-3 bg-blue-500" />
       <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-blue-500" />
@@ -114,7 +114,7 @@ const UMLClassNode: React.FC<UMLClassNodeProps> = ({ data, selected }) => {
 
       {/* Header */}
       <div
-        className={`${getEntityTypeColor(entity.type || 'class')} text-white px-3 py-2 rounded-t-lg relative`}
+        className={`${getEntityTypeColor(entity.type || 'class')} text-white px-3 py-2 relative`}
         onDoubleClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
       >
         {onDeleteEntity && (
