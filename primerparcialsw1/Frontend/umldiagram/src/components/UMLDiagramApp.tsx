@@ -10,25 +10,36 @@ import { SaveProjectModal } from './SaveProjectModal';
 import { Notification } from './Notification';
 import { useWebSocket } from '../hooks/useWebSocket';
 import type {
-  UMLDiagram, 
-  UMLEntity, 
-  UMLRelation, 
-  EntityType, 
+  UMLDiagram,
+  UMLEntity,
+  UMLRelation,
+  EntityType,
   RelationType
 } from '../types/uml';
 import { CardinalityUtils } from '../types/uml';
 import { exportAsZip, exportDiagramAsJson } from '../utils/projectExporter';
 import { projectService } from '../services/projectService';
+import { exportFlutterProject } from '@/utils/flutterExporter';
 
 // Componente principal que maneja el estado del diagrama
 const UMLDiagramApp: React.FC = () => {
   // Estado para controlar si estamos en el cliente (para evitar errores de hidratación)
   const [isClient, setIsClient] = useState(false);
-
+  const [exporting, setExporting] = useState(false);
   // Estado del diagrama
+  const handleExportFlutter = async () => {
+    try {
+      setExporting(true);
+      await exportFlutterProject(diagram, { zipName: "flutter_ui" });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+
   const [diagram, setDiagram] = useState<UMLDiagram>({
     id: 'diagram-1',
-  name: 'Nuevo Diagrama UML',
+    name: 'Nuevo Diagrama UML',
     entities: [],
     relations: [],
     packages: [],
@@ -38,6 +49,8 @@ const UMLDiagramApp: React.FC = () => {
       version: '1.0.0'
     }
   });
+
+
 
   // Herramienta seleccionada en la sidebar
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
@@ -87,18 +100,18 @@ const UMLDiagramApp: React.FC = () => {
         try {
           const project = JSON.parse(savedProject);
           console.log('Proyecto desde localStorage:', project);
-          
+
           // Establecer el proyecto actual para auto-guardado
           setCurrentProject({
             id: project.id,
             nombre: project.nombre,
             descripcion: project.descripcion
           });
-          
+
           if (project.contenido_diagrama && Object.keys(project.contenido_diagrama).length > 0) {
             // Si tiene contenido de diagrama, cargarlo
             console.log('Contenido del diagrama:', project.contenido_diagrama);
-            
+
             setDiagram({
               ...project.contenido_diagrama,
               id: project.contenido_diagrama.id || `diagram-${Date.now()}`,
@@ -187,9 +200,9 @@ const UMLDiagramApp: React.FC = () => {
         modified: new Date()
       }
     };
-    
+
     setDiagram(newDiagram);
-    
+
     // Enviar actualización a colaboradores si estamos en una sala
     if (roomState.roomCode) {
       console.log('[Colaboración][TX] Enviando actualización de diagrama a la sala', roomState.roomCode);
@@ -235,11 +248,11 @@ const UMLDiagramApp: React.FC = () => {
   // Generar código Spring Boot
   const handleGenerateCode = useCallback(() => {
     console.log('Generating Spring Boot code...', diagram);
-    
+
     // Crear estructura de archivos para el backend
     const entities = diagram.entities.filter(e => !e.isGenerated);
     const intermediateEntities = diagram.entities.filter(e => e.isGenerated);
-    
+
     const codeStructure = {
       entities: entities.map(entity => ({
         name: entity.name,
@@ -268,9 +281,9 @@ const UMLDiagramApp: React.FC = () => {
     };
 
     console.log('Code structure:', codeStructure);
-    
+
     // Aquí se implementaría la generación real del código
-  alert(`Generando código para:\n- ${entities.length} entidades\n- ${intermediateEntities.length} tablas intermedias\n- ${diagram.relations.length} relaciones\n\nLa generación de código se implementará en la integración con el backend.`);
+    alert(`Generando código para:\n- ${entities.length} entidades\n- ${intermediateEntities.length} tablas intermedias\n- ${diagram.relations.length} relaciones\n\nLa generación de código se implementará en la integración con el backend.`);
   }, [diagram]);
 
   // Manejar diagrama generado por IA
@@ -284,9 +297,9 @@ const UMLDiagramApp: React.FC = () => {
         author: newDiagram.metadata?.author
       }
     };
-    
+
     setDiagram(updatedDiagram);
-    
+
     // Enviar actualización a colaboradores si estamos en una sala
     if (roomState.roomCode) {
       sendDiagramUpdate(updatedDiagram);
@@ -328,7 +341,7 @@ const UMLDiagramApp: React.FC = () => {
       nombre: project.nombre,
       descripcion: project.descripcion
     });
-    
+
     setNotification({
       message: `Proyecto "${project.nombre}" guardado exitosamente`,
       type: 'success'
@@ -443,6 +456,12 @@ const UMLDiagramApp: React.FC = () => {
           >
             🚀 Exportar Backend Spring Boot
           </button>
+          <button
+            onClick={handleExportFlutter}
+            className="px-6 py-3 bg-gradient-to-r from-blue-500 text-white rounded-lg shadow-lg font-semibold text-lg hover:from-purple-700 hover:to-blue-700 transition-all"
+          >
+            Exportar UI Flutter
+          </button>
         </div>
       </div>
 
@@ -452,21 +471,19 @@ const UMLDiagramApp: React.FC = () => {
         <div className="flex border-b">
           <button
             onClick={() => setActivePanel(activePanel === 'ai' ? null : 'ai')}
-            className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
-              activePanel === 'ai' 
-                ? 'bg-blue-500 text-white' 
-                : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-            }`}
+            className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${activePanel === 'ai'
+              ? 'bg-blue-500 text-white'
+              : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+              }`}
           >
             💬 IA/Voz
           </button>
           <button
             onClick={() => setActivePanel(activePanel === 'collab' ? null : 'collab')}
-            className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
-              activePanel === 'collab' 
-                ? 'bg-purple-500 text-white' 
-                : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-            }`}
+            className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${activePanel === 'collab'
+              ? 'bg-purple-500 text-white'
+              : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+              }`}
           >
             🤝 Sala
             {roomState.roomCode && (
@@ -487,7 +504,7 @@ const UMLDiagramApp: React.FC = () => {
             />
           )}
           {activePanel === 'collab' && (
-            <CollaborationPanel 
+            <CollaborationPanel
               roomState={roomState}
               createRoom={(d?: UMLDiagram) => {
                 console.log('[Colaboración][UI] Crear sala solicitado');
