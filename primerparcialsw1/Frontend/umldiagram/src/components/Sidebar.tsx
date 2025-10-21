@@ -11,6 +11,7 @@ interface SidebarProps {
   onGenerateCode: () => void;
   onExportDiagram: () => void;
   onImportDiagram: () => void;
+  onImportFromImage: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -20,7 +21,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   onCreateRelation,
   onGenerateCode,
   onExportDiagram,
-  onImportDiagram
+  onImportDiagram,
+  onImportFromImage
 }) => {
   const [activeSection, setActiveSection] = useState<string>('entities');
 
@@ -166,7 +168,19 @@ const Sidebar: React.FC<SidebarProps> = ({
               >
                 <div className="flex items-center space-x-2">
                   <span>📥</span>
-                  <span className="text-sm">Importar Diagrama</span>
+                  <span className="text-sm">Importar JSON</span>
+                </div>
+              </button>
+              <button
+                onClick={onImportFromImage}
+                className="w-full p-2 text-left bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg hover:from-green-600 hover:to-teal-700 transition-colors shadow-sm"
+              >
+                <div className="flex items-center space-x-2">
+                  <span>📸</span>
+                  <div>
+                    <div className="font-medium text-sm">Importar desde Imagen</div>
+                    <div className="text-xs opacity-90">Escanear con Gemini AI</div>
+                  </div>
                 </div>
               </button>
             </div>

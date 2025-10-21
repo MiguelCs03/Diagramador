@@ -1,6 +1,7 @@
-// Configuración de la API (fijada a producción por solicitud)
-//const API_BASE_URL = 'https://diagramadoruml.onrender.com/api';
-const API_BASE_URL = 'https://localhost:8000/api';
+// Usar variable de entorno o fallback a localhost
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = `${API_URL}/api`;
+
 // Servicio de autenticación
 export const authService = {
   // Login
