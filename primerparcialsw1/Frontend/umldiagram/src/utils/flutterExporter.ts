@@ -35,8 +35,25 @@ flutter:
 `;
 }
 
-function baseMainDart(): string {
+function baseMainDart(entityNames: string[] = []): string {
+  // Sidebar Drawer items
+  const drawerItems = entityNames.map((name) => {
+    const pascal = FlutterGen.toPascalCase(name);
+    const snake = FlutterGen.toSnakeCase(name);
+    return `ListTile(
+      leading: Icon(Icons.table_chart),
+      title: Text('${pascal}'),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => ${pascal}ListScreen()),
+        );
+      },
+    ),`;
+  }).join('\n              ');
+
   return `import 'package:flutter/material.dart';
+${entityNames.map(name => `import 'screens/${FlutterGen.toSnakeCase(name)}/${FlutterGen.toSnakeCase(name)}_list_screen.dart';`).join('\n')}
 
 void main() {
   runApp(const GeneratedApp());
@@ -50,22 +67,32 @@ class GeneratedApp extends StatelessWidget {
     return MaterialApp(
       title: 'UI Generada',
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
-      home: const _HomeGenerated(),
+      home: _HomeGenerated(),
       debugShowCheckedModeBanner: false,
     );
   }
 }
 
 class _HomeGenerated extends StatelessWidget {
-  const _HomeGenerated({super.key});
-
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       appBar: AppBar(title: Text('Proyecto Flutter generado')),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: <Widget>[
+            DrawerHeader(
+              decoration: BoxDecoration(color: Colors.blue),
+              child: Text('Tablas UML', style: TextStyle(color: Colors.white, fontSize: 24)),
+            ),
+${drawerItems}
+          ],
+        ),
+      ),
       body: Center(
         child: Text(
-          'Las pantallas CRUD por clase están en lib/screens/',
+          'Selecciona una tabla en el menú lateral para ver su CRUD.',
           textAlign: TextAlign.center,
         ),
       ),
@@ -113,7 +140,8 @@ export async function exportFlutterProject(
   lib.folder("screens");
 
   zip.file("pubspec.yaml", basePubspecYaml());
-  lib.file("main.dart", baseMainDart());
+  // Pass entity names to baseMainDart for sidebar generation
+  lib.file("main.dart", baseMainDart((diagram.entities ?? []).map(e => e.name)));
 
   // Generar archivos por clase UML
   (diagram.entities ?? []).forEach((cls) => exportClassScreens(zip, cls));

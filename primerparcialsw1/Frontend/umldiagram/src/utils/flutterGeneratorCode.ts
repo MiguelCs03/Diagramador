@@ -126,17 +126,18 @@ ${indent(fieldsUI, 14)}
 export function genDetailScreenDart(cls: UMLEntity): string {
     const className = toPascalCase(cls.name);
 
+    // Generate rows without `const` so we can include dynamic values safely.
     const rows = cls.attributes
         .map(
             (a) => `Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
+          children: [
             Text('${a.name}'),
-            Text('<${mapDartType(a.type)}>'),
+            Text('${mapDartType(a.type)}'),
           ],
         ),`
         )
-        .join("\n            const Divider(),\n            ");
+        .join("\n            Divider(),\n            ");
 
     return `import 'package:flutter/material.dart';
 
@@ -168,6 +169,8 @@ function textFieldFromAttribute(attr: UMLAttribute): string {
     const keyboard = keyboardTypeFrom(attr.type);
 
     // Campo visual sin lógica (placeholder)
+    // Add a trailing comma after the widget so it can be used safely inside
+    // a `children: [ ... ]` list in the generated Dart code.
     return `TextField(
               decoration: const InputDecoration(
                 labelText: '${label}',
@@ -175,7 +178,7 @@ function textFieldFromAttribute(attr: UMLAttribute): string {
               ),
               keyboardType: ${keyboard},
               enabled: true,
-            )`;
+            ),`;
 }
 
 function keyboardTypeFrom(type: string): string {
