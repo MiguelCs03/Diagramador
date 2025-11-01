@@ -24,6 +24,39 @@ export class SpringBootCodeGenerator {
       entity.type === 'class' || entity.type === 'abstract'
     );
 
+    // --- NUEVO: Preprocesar relaciones para agregar atributos inversos ---
+    // Creamos un mapa de entidades para fácil acceso
+    const entityMap: Record<string, UMLEntity> = {};
+    classEntities.forEach(e => { entityMap[e.id] = e; });
+
+    // Para cada relación relevante, si es OneToMany, aseguramos el ManyToOne en el destino
+    this.diagram.relations.forEach((relation) => {
+      if (["association", "aggregation", "composition"].includes(relation.type)) {
+        const source = entityMap[relation.source];
+        const target = entityMap[relation.target];
+        if (!source || !target) return;
+        const sourceCard = relation.sourceCardinality;
+        const targetCard = relation.targetCardinality;
+        const isOneToMany = sourceCard.max === 1 && (targetCard.max === 'unlimited' || (typeof targetCard.max === 'number' && targetCard.max > 1));
+        if (isOneToMany) {
+            const sourceClassName = this.capitalize(source.name);
+            const fieldName = source.name.charAt(0).toLowerCase() + source.name.slice(1);
+            // Eliminar cualquier atributo Long con el mismo nombre antes de agregar la relación
+            target.attributes = target.attributes.filter(a => !(a.name === fieldName && a.type === 'Long'));
+            const alreadyExists = target.attributes.some(a => a.name === fieldName && a.type === sourceClassName);
+            if (!alreadyExists) {
+              target.attributes.push({
+                id: `rel-${source.id}-${target.id}`,
+                name: fieldName,
+                type: sourceClassName, // Esto hará que el generador de campos cree un ManyToOne real
+                visibility: 'private',
+                isKey: false
+              });
+            }
+        }
+      }
+    });
+
     // Generate files for each class entity
     classEntities.forEach((entity) => {
       files.push(this.generateEntity(entity));
@@ -34,7 +67,6 @@ export class SpringBootCodeGenerator {
     });
 
     // 2. LLAMADA AL NUEVO MÉTODO PARA GENERAR EL ARCHIVO CORS GLOBAL
-    // Esto se ejecuta una vez, no por cada entidad.
     files.push(this.generateCorsConfig());
 
     return files;
