@@ -8,6 +8,7 @@ import { CollaborationPanel } from './CollaborationPanel';
 import HelpButton from './HelpButton';
 import { SaveProjectModal } from './SaveProjectModal';
 import { Notification } from './Notification';
+import ImportImage from './ImportImage';
 import { useWebSocket } from '../hooks/useWebSocket';
 import type {
   UMLDiagram,
@@ -20,7 +21,9 @@ import { CardinalityUtils } from '../types/uml';
 import { exportAsZip, exportDiagramAsJson } from '../utils/projectExporter';
 import { projectService } from '../services/projectService';
 import { exportFlutterProject } from '@/utils/flutterExporter';
+import { parseDiagramImage } from '../services/ocrService';
 
+  
 // Componente principal que maneja el estado del diagrama
 const UMLDiagramApp: React.FC = () => {
   // Estado para controlar si estamos en el cliente (para evitar errores de hidratación)
@@ -60,6 +63,9 @@ const UMLDiagramApp: React.FC = () => {
 
   // Estado para el modal de guardar proyecto
   const [showSaveModal, setShowSaveModal] = useState(false);
+
+  // Estado para el modal de importar imagen
+  const [showImportImageModal, setShowImportImageModal] = useState(false);
 
   // Estado para notificaciones
   const [notification, setNotification] = useState<{
@@ -383,6 +389,31 @@ const UMLDiagramApp: React.FC = () => {
     input.click();
   }, []);
 
+  // Importar diagrama desde imagen usando AI
+  const handleImportFromImage = useCallback(() => {
+    setShowImportImageModal(true);
+  }, []);
+
+  // Procesar diagrama importado desde imagen
+  const handleImageImport = useCallback((importedDiagram: UMLDiagram) => {
+    // Actualizar el diagrama con el resultado
+    setDiagram({
+      ...importedDiagram,
+      metadata: {
+        created: new Date(),
+        modified: new Date(),
+        version: '1.0.0',
+        author: importedDiagram.metadata?.author || 'Gemini AI'
+      }
+    });
+
+    setShowImportImageModal(false);
+    setNotification({ 
+      message: `¡Diagrama importado exitosamente! Detectadas ${importedDiagram.entities?.length || 0} entidades`, 
+      type: 'success' 
+    });
+  }, []);
+
   // Limpiar herramienta seleccionada
   const handleClearTool = useCallback(() => {
     setSelectedTool(null);
@@ -431,6 +462,7 @@ const UMLDiagramApp: React.FC = () => {
         onGenerateCode={handleGenerateCode}
         onExportDiagram={handleExportDiagram}
         onImportDiagram={handleImportDiagram}
+        onImportFromImage={handleImportFromImage}
       />
 
 
@@ -534,6 +566,24 @@ const UMLDiagramApp: React.FC = () => {
         onSaveSuccess={handleSaveSuccess}
         currentProject={currentProject}
       />
+
+      {/* Modal para importar desde imagen */}
+      {showImportImageModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-gray-800">Importar Diagrama desde Imagen</h2>
+              <button
+                onClick={() => setShowImportImageModal(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            <ImportImage onImport={handleImageImport} />
+          </div>
+        </div>
+      )}
 
       {/* Notificaciones */}
       {notification && (

@@ -1,7 +1,9 @@
 import { authService } from './authService';
 import { Project } from '../types/auth';
 
-const API_BASE_URL = 'https://diagramadoruml.onrender.com/api';
+// Usar variable de entorno o fallback a localhost
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = `${API_URL}/api`;
 
 export const projectService = {
   // Crear nuevo proyecto

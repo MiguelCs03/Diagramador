@@ -24,10 +24,12 @@ const { sequelize } = require('./models');
 // Importar rutas
 const authRoutes = require('./routes/auth');
 const projectRoutes = require('./routes/projects');
+const parseRoutes = require('./routes/parse');
 
 // Usar rutas
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/parse', parseRoutes);
 
 // Probar conexión y sincronizar modelos con reintentos (útil en Render al levantar servicios)
 const connectWithRetry = async (retries = 5, delayMs = 3000) => {
