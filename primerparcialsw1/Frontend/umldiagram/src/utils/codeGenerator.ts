@@ -1,4 +1,4 @@
-import type { UMLDiagram, UMLEntity, UMLRelation, UMLAttribute } from '../types/uml';
+import type { UMLDiagram, UMLEntity, UMLRelation, UMLAttribute, DataType } from '../types/uml';
 
 // 1. TIPO 'CONFIG' AÑADIDO A LA INTERFAZ
 interface GeneratedFile {
@@ -48,7 +48,15 @@ export class SpringBootCodeGenerator {
               target.attributes.push({
                 id: `rel-${source.id}-${target.id}`,
                 name: fieldName,
-                type: sourceClassName, // Esto hará que el generador de campos cree un ManyToOne real
+                type: ((): DataType => {
+                  const allowed: DataType[] = [
+                    'String', 'Integer', 'Long', 'Double', 'Float', 'Boolean', 'Date', 'DateTime', 'BigDecimal', 'UUID', 'Text'
+                  ];
+                  if (allowed.includes(sourceClassName as DataType)) {
+                    return sourceClassName as DataType;
+                  }
+                  throw new Error(`Invalid DataType: ${sourceClassName}`);
+                })(), // Esto hará que el generador de campos cree un ManyToOne real
                 visibility: 'private',
                 isKey: false
               });
