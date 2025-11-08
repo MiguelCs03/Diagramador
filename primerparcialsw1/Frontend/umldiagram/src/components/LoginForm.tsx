@@ -13,8 +13,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
     email: '',
     password: '',
   });
-    // Mostrar variable de entorno en consola del navegador
-    console.log("NEXT_PUBLIC_API_URL:", process.env.NEXT_PUBLIC_API_URL);
+  
   const [error, setError] = useState('');
   const { login, register, loading } = useAuth();
 
