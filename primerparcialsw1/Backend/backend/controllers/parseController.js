@@ -4,6 +4,11 @@ const parseController = {
   // POST /api/parse-diagram
   parse: async (req, res) => {
     try {
+      console.log('[parseController] Solicitud recibida');
+      console.log('[parseController] Método:', req.method);
+      console.log('[parseController] Headers:', req.headers);
+      console.log('[parseController] Body keys:', Object.keys(req.body));
+      console.log('[parseController] File:', req.file ? req.file.originalname : 'No file');
       if (!req.file || !req.file.buffer) {
         return res.status(400).json({ error: 'No image provided' });
       }
