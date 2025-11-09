@@ -76,6 +76,8 @@ const authController = {
   // Login de usuario
   login: async (req, res) => {
     try {
+      console.log('[authController] Login solicitado');
+      console.log('[authController] Email recibido:', req.body.email);
       const { email, password } = req.body;
 
       // Validar campos
