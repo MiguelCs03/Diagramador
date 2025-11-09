@@ -28,6 +28,7 @@ import type {
 import { CardinalityUtils } from '../types/uml';
 import UMLClassNode from './UMLClassNode';
 import UMLRelationEdge from './UMLRelationEdge';
+import CompositionModal from './CompositionModal';
 
 // Tipos de nodos y bordes personalizados
 const nodeTypes = {
@@ -58,6 +59,9 @@ const DiagramEditorInner: React.FC<DiagramEditorProps> = ({
   // Estado local para nodos y bordes
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
+  
+  // Estado para modal de composición
+  const [showCompositionModal, setShowCompositionModal] = useState(false);
 
   // Convertir entidades UML a nodos de React Flow
   const convertEntitiesToNodes = useCallback(
@@ -365,12 +369,35 @@ const DiagramEditorInner: React.FC<DiagramEditorProps> = ({
     (connection: Connection) => {
       if (connection.source && connection.target && selectedTool?.startsWith('relation-')) {
         const relationType = selectedTool.replace('relation-', '') as RelationType;
+        
+        // Para composición, no conectar directamente (se usa el modal)
+        if (relationType === 'composition') {
+          return;
+        }
+        
         createRelation(relationType, connection.source, connection.target, '1', '1');
         if (onClearTool) onClearTool();
       }
     },
     [createRelation, selectedTool, onClearTool]
   );
+
+  // Manejar confirmación del modal de composición
+  const handleCompositionConfirm = useCallback(
+    (sourceId: string, targetId: string) => {
+      createRelation('composition', sourceId, targetId, '1', '1');
+      setShowCompositionModal(false);
+      if (onClearTool) onClearTool();
+    },
+    [createRelation, onClearTool]
+  );
+
+  // Detectar cuando se selecciona la herramienta de composición
+  useEffect(() => {
+    if (selectedTool === 'relation-composition' && diagram.entities.length >= 2) {
+      setShowCompositionModal(true);
+    }
+  }, [selectedTool, diagram.entities.length]);
 
   // Manejar click en el panel
   const onPaneClick = useCallback(
@@ -444,6 +471,18 @@ const DiagramEditorInner: React.FC<DiagramEditorProps> = ({
           </div>
         )}
       </div>
+
+      {/* Modal de composición */}
+      {showCompositionModal && (
+        <CompositionModal
+          entities={diagram.entities}
+          onConfirm={handleCompositionConfirm}
+          onCancel={() => {
+            setShowCompositionModal(false);
+            if (onClearTool) onClearTool();
+          }}
+        />
+      )}
     </div>
   );
 };

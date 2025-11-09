@@ -46,6 +46,7 @@ function sanitizeRelation(rel, now, idx) {
     source: ensureString(rel?.source, ''),
     target: ensureString(rel?.target, ''),
     type: ensureString(rel?.type, 'association'),
+    label: rel?.label ?? '',
     ...rel
   };
 }

@@ -35,6 +35,28 @@ const parseController = {
       console.log(`[parseController] Analysis completed in ${elapsed}s`);
       console.log(`[parseController] Result: ${result.diagram?.entities?.length || 0} entities, ${result.diagram?.relations?.length || 0} relations`);
 
+      // Normalizar las relaciones para evitar errores en el frontend cuando la IA no detecta cardinalidades o etiquetas
+      try {
+        const rawRelations = Array.isArray(result.diagram?.relations) ? result.diagram.relations : [];
+        const normalizedRelations = rawRelations.map((r, idx) => ({
+          id: r?.id ?? `rel-${Date.now()}-${idx}`,
+          source: r?.source ?? '', // Origen de la relación
+          target: r?.target ?? '', // Destino de la relación
+          type: r?.type ?? 'association', // Tipo de relación (por defecto asociación)
+          label: r?.label ?? '', // Etiqueta de la relación (por defecto vacío)
+          sourceCardinality: r?.sourceCardinality ?? { min: null, max: null, label: '' }, // Cardinalidad origen
+          targetCardinality: r?.targetCardinality ?? { min: null, max: null, label: '' }, // Cardinalidad destino
+          sourceRole: r?.sourceRole ?? '', // Rol en el origen
+          targetRole: r?.targetRole ?? '', // Rol en el destino
+          ...r
+        }));
+        // Asegurarse que el diagrama existe y asignar las relaciones normalizadas
+        result.diagram = { ...(result.diagram || {}), relations: normalizedRelations };
+        console.log('[parseController] Relaciones normalizadas:', normalizedRelations);
+      } catch (normErr) {
+        console.error('[parseController] Error al normalizar relaciones:', normErr);
+      }
+
       // Si el motor de IA falló y estamos usando el fallback, notificarlo en la respuesta.
       if (result.meta?.engine === 'fallback-mock' && result.meta?.error) {
         return res.status(502).json({ error: 'AI provider failed', details: result.meta.error, diagram: result.diagram, meta: result.meta });

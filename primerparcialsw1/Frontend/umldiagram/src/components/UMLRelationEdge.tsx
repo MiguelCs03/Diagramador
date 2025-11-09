@@ -29,6 +29,12 @@ const UMLRelationEdge: React.FC<UMLRelationEdgeProps> = ({
   
   if (!relation) return null;
 
+  // Defensive defaults in case the parser/AI returns incomplete relation objects
+  const sourceCardLabel = relation.sourceCardinality?.label ?? '';
+  const targetCardLabel = relation.targetCardinality?.label ?? '';
+  const relationLabel = relation.label ?? '';
+  const relationType = (relation.type || 'association') as RelationType;
+
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -51,21 +57,32 @@ const UMLRelationEdge: React.FC<UMLRelationEdgeProps> = ({
     return selected ? 3 : 2;
   };
 
-  const getMarkerEnd = (type: RelationType): string => {
+  // Para composición y agregación, el marcador va al inicio (source)
+  const getMarkerStart = (type: RelationType): string | undefined => {
+    switch (type) {
+      case 'composition':
+        return 'url(#composition-marker)';
+      case 'aggregation':
+        return 'url(#aggregation-marker)';
+      default:
+        return undefined;
+    }
+  };
+
+  // Para herencia, implementación y dependencia, el marcador va al final (target)
+  const getMarkerEnd = (type: RelationType): string | undefined => {
     switch (type) {
       case 'inheritance':
         return 'url(#inheritance-marker)';
       case 'implementation':
         return 'url(#implementation-marker)';
-      case 'composition':
-        return 'url(#composition-marker)';
-      case 'aggregation':
-        return 'url(#aggregation-marker)';
       case 'dependency':
         return 'url(#dependency-marker)';
       case 'association':
+      case 'composition':
+      case 'aggregation':
       default:
-        return 'url(#association-marker)';
+        return undefined; // Sin flecha/punta para asociación, composición y agregación en el final
     }
   };
 
@@ -137,14 +154,14 @@ const UMLRelationEdge: React.FC<UMLRelationEdgeProps> = ({
             />
           </marker>
 
-          {/* Marcador de composición (diamante lleno) */}
+          {/* Marcador de composición (diamante lleno) - va en el source (todo) */}
           <marker
             id="composition-marker"
             markerWidth="12"
             markerHeight="8"
             refX="9"
             refY="3"
-            orient="auto"
+            orient="auto-start-reverse"
             markerUnits="strokeWidth"
           >
             <path
@@ -155,14 +172,14 @@ const UMLRelationEdge: React.FC<UMLRelationEdgeProps> = ({
             />
           </marker>
 
-          {/* Marcador de agregación (diamante hueco) */}
+          {/* Marcador de agregación (diamante hueco) - va en el source (todo) */}
           <marker
             id="aggregation-marker"
             markerWidth="12"
             markerHeight="8"
             refX="9"
             refY="3"
-            orient="auto"
+            orient="auto-start-reverse"
             markerUnits="strokeWidth"
           >
             <path
@@ -190,34 +207,17 @@ const UMLRelationEdge: React.FC<UMLRelationEdgeProps> = ({
               strokeWidth="1"
             />
           </marker>
-
-          {/* Marcador de asociación (flecha simple) */}
-          <marker
-            id="association-marker"
-            markerWidth="10"
-            markerHeight="10"
-            refX="7"
-            refY="3"
-            orient="auto"
-            markerUnits="strokeWidth"
-          >
-            <path
-              d="M0,0 L0,6 L7,3 z"
-              fill="black"
-              stroke="black"
-              strokeWidth="1"
-            />
-          </marker>
         </defs>
       </svg>
 
       <BaseEdge
         path={edgePath}
-        markerEnd={getMarkerEnd(relation.type)}
+        markerStart={getMarkerStart(relationType)}
+        markerEnd={getMarkerEnd(relationType)}
         style={{
           strokeWidth: getStrokeWidth(selected || false),
           stroke: selected ? '#3b82f6' : '#374151',
-          strokeDasharray: getStrokeStyle(relation.type),
+          strokeDasharray: getStrokeStyle(relationType),
         }}
       />
 
@@ -232,11 +232,11 @@ const UMLRelationEdge: React.FC<UMLRelationEdgeProps> = ({
           className="nodrag nopan"
         >
           {/* Etiqueta de la relación */}
-          {relation.label && (
+          {relationLabel ? (
             <div className="bg-white px-1 border border-gray-300 rounded text-xs font-semibold text-gray-700 mb-1 text-center">
-              {relation.label}
+              {relationLabel}
             </div>
-          )}
+          ) : null}
 
           {/* Cardinalidades y botón eliminar */}
           <div className="flex justify-between items-center min-w-[110px] space-x-1">
@@ -246,7 +246,7 @@ const UMLRelationEdge: React.FC<UMLRelationEdgeProps> = ({
                 <select
                   autoFocus
                   className="text-xs border border-yellow-300 rounded bg-yellow-50 px-1 py-0.5"
-                  defaultValue={relation.sourceCardinality.label}
+                  defaultValue={sourceCardLabel}
                   onChange={(e) => { updateSourceCardinality(e.target.value); setEditSource(false); }}
                   onBlur={() => setEditSource(false)}
                   onClick={(e) => e.stopPropagation()}
@@ -261,14 +261,14 @@ const UMLRelationEdge: React.FC<UMLRelationEdgeProps> = ({
                   onClick={(e) => { e.stopPropagation(); setEditSource(true); }}
                   title="Editar cardinalidad (origen)"
                 >
-                  {relation.sourceCardinality.label}
+                  {sourceCardLabel}
                 </button>
               )}
             </div>
 
             {/* Tipo de relación */}
-            <div className="bg-blue-100 px-1 border border-blue-300 rounded text-xs text-blue-800 mx-1">
-              {getRelationLabel(relation.type)}
+              <div className="bg-blue-100 px-1 border border-blue-300 rounded text-xs text-blue-800 mx-1">
+              {getRelationLabel(relationType)}
             </div>
 
             {/* Cardinalidad destino */}
@@ -277,7 +277,7 @@ const UMLRelationEdge: React.FC<UMLRelationEdgeProps> = ({
                 <select
                   autoFocus
                   className="text-xs border border-yellow-300 rounded bg-yellow-50 px-1 py-0.5"
-                  defaultValue={relation.targetCardinality.label}
+                  defaultValue={targetCardLabel}
                   onChange={(e) => { updateTargetCardinality(e.target.value); setEditTarget(false); }}
                   onBlur={() => setEditTarget(false)}
                   onClick={(e) => e.stopPropagation()}
@@ -292,7 +292,7 @@ const UMLRelationEdge: React.FC<UMLRelationEdgeProps> = ({
                   onClick={(e) => { e.stopPropagation(); setEditTarget(true); }}
                   title="Editar cardinalidad (destino)"
                 >
-                  {relation.targetCardinality.label}
+                  {targetCardLabel}
                 </button>
               )}
               {onDeleteRelation && (
