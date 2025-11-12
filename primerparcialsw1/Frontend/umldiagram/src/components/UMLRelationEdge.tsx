@@ -88,9 +88,9 @@ const UMLRelationEdge: React.FC<UMLRelationEdgeProps> = ({
 
   const getRelationLabel = (type: RelationType): string => {
     switch (type) {
-      case 'inheritance': return 'extends';
+      case 'inheritance': return ''; // No mostrar label para herencia
       case 'implementation': return 'implements';
-      case 'composition': return 'composed of';
+      case 'composition': return ''; // No mostrar label para composición (ya lo pediste antes)
       case 'aggregation': return 'aggregates';
       case 'dependency': return 'depends on';
       case 'association': return 'associated with';
@@ -238,74 +238,82 @@ const UMLRelationEdge: React.FC<UMLRelationEdgeProps> = ({
             </div>
           ) : null}
 
-          {/* Cardinalidades y botón eliminar */}
-          <div className="flex justify-between items-center min-w-[110px] space-x-1">
-            {/* Cardinalidad origen */}
-            <div className="flex items-center">
-              {editSource ? (
-                <select
-                  autoFocus
-                  className="text-xs border border-yellow-300 rounded bg-yellow-50 px-1 py-0.5"
-                  defaultValue={sourceCardLabel}
-                  onChange={(e) => { updateSourceCardinality(e.target.value); setEditSource(false); }}
-                  onBlur={() => setEditSource(false)}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {CARDINALITY_VALUES.map((v) => (
-                    <option key={v} value={v}>{v}</option>
-                  ))}
-                </select>
-              ) : (
-                <button
-                  className="bg-yellow-100 px-1 border border-yellow-300 rounded text-xs font-bold text-gray-800"
-                  onClick={(e) => { e.stopPropagation(); setEditSource(true); }}
-                  title="Editar cardinalidad (origen)"
-                >
-                  {sourceCardLabel}
-                </button>
-              )}
-            </div>
 
-            {/* Tipo de relación */}
-              <div className="bg-blue-100 px-1 border border-blue-300 rounded text-xs text-blue-800 mx-1">
-              {getRelationLabel(relationType)}
-            </div>
 
-            {/* Cardinalidad destino */}
-            <div className="flex items-center space-x-1">
-              {editTarget ? (
-                <select
-                  autoFocus
-                  className="text-xs border border-yellow-300 rounded bg-yellow-50 px-1 py-0.5"
-                  defaultValue={targetCardLabel}
-                  onChange={(e) => { updateTargetCardinality(e.target.value); setEditTarget(false); }}
-                  onBlur={() => setEditTarget(false)}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {CARDINALITY_VALUES.map((v) => (
-                    <option key={v} value={v}>{v}</option>
-                  ))}
-                </select>
-              ) : (
-                <button
-                  className="bg-yellow-100 px-1 border border-yellow-300 rounded text-xs font-bold text-gray-800"
-                  onClick={(e) => { e.stopPropagation(); setEditTarget(true); }}
-                  title="Editar cardinalidad (destino)"
-                >
-                  {targetCardLabel}
-                </button>
-              )}
-              {onDeleteRelation && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onDeleteRelation(); }}
-                  className="text-red-600 hover:text-red-800 text-xs font-bold"
-                  title="Eliminar relación"
-                >
-                  ✕
-                </button>
-              )}
+          {/* Cardinalidades (solo si no es composición ni herencia/generalización) */}
+          {relationType !== 'composition' && relationType !== 'inheritance' && (
+            <div className="flex justify-between items-center min-w-[110px] space-x-1">
+              {/* Cardinalidad origen */}
+              <div className="flex items-center">
+                {editSource ? (
+                  <select
+                    autoFocus
+                    className="text-xs border border-yellow-300 rounded bg-yellow-50 px-1 py-0.5"
+                    defaultValue={sourceCardLabel}
+                    onChange={(e) => { updateSourceCardinality(e.target.value); setEditSource(false); }}
+                    onBlur={() => setEditSource(false)}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {CARDINALITY_VALUES.map((v) => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <button
+                    className="bg-yellow-100 px-1 border border-yellow-300 rounded text-xs font-bold text-gray-800"
+                    onClick={(e) => { e.stopPropagation(); setEditSource(true); }}
+                    title="Editar cardinalidad (origen)"
+                  >
+                    {sourceCardLabel}
+                  </button>
+                )}
+              </div>
+
+              {/* Tipo de relación */}
+                <div className="bg-blue-100 px-1 border border-blue-300 rounded text-xs text-blue-800 mx-1">
+                {getRelationLabel(relationType)}
+              </div>
+
+              {/* Cardinalidad destino */}
+              <div className="flex items-center space-x-1">
+                {editTarget ? (
+                  <select
+                    autoFocus
+                    className="text-xs border border-yellow-300 rounded bg-yellow-50 px-1 py-0.5"
+                    defaultValue={targetCardLabel}
+                    onChange={(e) => { updateTargetCardinality(e.target.value); setEditTarget(false); }}
+                    onBlur={() => setEditTarget(false)}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {CARDINALITY_VALUES.map((v) => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <button
+                    className="bg-yellow-100 px-1 border border-yellow-300 rounded text-xs font-bold text-gray-800"
+                    onClick={(e) => { e.stopPropagation(); setEditTarget(true); }}
+                    title="Editar cardinalidad (destino)"
+                  >
+                    {targetCardLabel}
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Botón eliminar relación (siempre visible si existe handler) */}
+          {onDeleteRelation && (
+            <div className="flex justify-end mt-1">
+              <button
+                onClick={(e) => { e.stopPropagation(); onDeleteRelation(); }}
+                className="text-red-600 hover:text-red-800 text-xs font-bold"
+                title="Eliminar relación"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           {/* Roles */}
           {(relation.sourceRole || relation.targetRole) && (

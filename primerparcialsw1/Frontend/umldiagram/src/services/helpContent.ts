@@ -9,7 +9,7 @@ const topics: HelpTopic[] = [
   {
     id: 'crear-clase',
     title: 'Crear una clase',
-    keywords: ['crear clase', 'nueva clase', 'agregar clase', 'insertar clase', 'añadir clase', 'crear entidad'],
+    keywords: ['cómo crear clase', 'cómo agregar clase', 'ayuda crear clase', 'ayuda clase'],
     answer:
       'Para crear una clase:\n\n1. En la barra lateral, selecciona la herramienta "Clase".\n2. Haz clic en el lienzo donde quieras ubicarla.\n3. Se creará una entidad con nombre automático (Clase1, Clase2, ...).',
   },
@@ -23,21 +23,21 @@ const topics: HelpTopic[] = [
   {
     id: 'atributos',
     title: 'Agregar y editar atributos',
-    keywords: ['atributos', 'agregar atributo', 'editar atributo', 'quitar atributo'],
+    keywords: ['ayuda atributos', 'cómo agregar atributo', 'cómo editar atributo', 'ayuda atributo'],
     answer:
       'Para gestionar atributos:\n\n- Haz clic en el botón + en la sección "Atributos" para agregar uno nuevo.\n- Usa el icono de edición para modificar un atributo.\n- Usa el icono de eliminar para quitarlo.\n\nNota: Por simplicidad, esta app trabaja solo con atributos (no métodos).',
   },
   {
     id: 'eliminar',
     title: 'Eliminar clases y relaciones',
-    keywords: ['eliminar clase', 'borrar clase', 'eliminar relación', 'borrar relación', 'quitar relación'],
+    keywords: ['cómo eliminar clase', 'cómo borrar clase', 'cómo eliminar relación', 'ayuda eliminar'],
     answer:
       'Para eliminar:\n\n- Clases: usa el botón rojo ✕ en el encabezado de la clase.\n- Relaciones: haz clic en la relación y presiona el botón ✕ del borde.',
   },
   {
     id: 'relaciones',
     title: 'Crear y editar relaciones',
-    keywords: ['crear relación', 'agregar relación', 'editar relación', 'cardinalidad', 'navegabilidad'],
+    keywords: ['cómo crear relación', 'cómo agregar relación', 'cómo editar relación', 'qué es cardinalidad', 'ayuda con relaciones', 'ayuda relación'],
     answer:
       'Para crear una relación:\n\n1. Selecciona una herramienta de relación en la barra lateral (por ejemplo, Asociación).\n2. Arrastra desde el manejador (handle) de una clase hacia otra.\n\nPara editar cardinalidades:\n\n- Haz clic sobre la relación y usa los selectores en los extremos para cambiar la cardinalidad (1, 0..1, 1..*, 0..*, *).',
   },
@@ -89,6 +89,18 @@ const topics: HelpTopic[] = [
 export function getHelpResponse(query: string): string | null {
   if (!query) return null;
   const q = query.toLowerCase();
+
+  // IMPORTANTE: Solo responder si es una PREGUNTA de ayuda, NO un comando de acción
+  // Detectar si es una pregunta (tiene ?, cómo, qué, ayuda, manual, guía)
+  const isProbablyQuestion = /(\?|cómo|como|qué|que es|ayuda|manual|gu[ií]a|explica)/i.test(q);
+  
+  // Si no parece una pregunta, NO interceptar (dejar que la IA procese el comando)
+  if (!isProbablyQuestion) {
+    console.log('🚫 [HELP] No es una pregunta, dejando pasar a la IA');
+    return null;
+  }
+
+  console.log('❓ [HELP] Parece una pregunta de ayuda, buscando respuesta...');
 
   // Si el usuario pide explícitamente "guía" o "manual", devolver índice
   if (/(gu[ií]a|manual|ayuda|cómo empezar|como empezar)/i.test(q)) {

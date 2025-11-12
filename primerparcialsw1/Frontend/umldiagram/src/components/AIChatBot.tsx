@@ -164,34 +164,47 @@ const AIChatBot: React.FC<AIChatBotProps> = ({ onDiagramGenerated, currentDiagra
     addMessage('user', userMessage);
     setIsLoading(true);
 
+    console.log('💬 [CHATBOT] Mensaje del usuario recibido:', userMessage);
+    console.log('📊 [CHATBOT] currentDiagram existe:', !!currentDiagram);
+    console.log('📊 [CHATBOT] Entidades en diagrama actual:', currentDiagram?.entities.map(e => e.name));
+
     try {
       // 1) Intentar responder con ayuda local (manual) antes de llamar a la IA
       const localHelp = getHelpResponse(userMessage);
       if (localHelp) {
+        console.log('📖 [CHATBOT] Respuesta de ayuda local encontrada');
         addMessage('ai', localHelp);
         setIsLoading(false);
         return;
       }
 
       // Detectar la intención del usuario (KISS principle)
+      console.log('🔍 [CHATBOT] Detectando intención del usuario...');
       const intent = AIService.detectUserIntent(userMessage, !!currentDiagram);
+      console.log('🎯 [CHATBOT] Intención detectada:', intent);
       
       if (intent === 'modify' && currentDiagram) {
+        console.log('✏️ [CHATBOT] Modo: MODIFICAR diagrama existente');
         // Modificar diagrama existente
         const request: DiagramModificationRequest = {
           command: userMessage,
           currentDiagram: currentDiagram
         };
 
+        console.log('🚀 [CHATBOT] Llamando a AIService.modifyDiagram...');
         const response: DiagramModificationResponse = await AIService.modifyDiagram(request);
+        console.log('📦 [CHATBOT] Respuesta de modifyDiagram:', response);
 
         if (response.success && response.updatedDiagram) {
+          console.log('✅ [CHATBOT] Modificación exitosa');
           addMessage('ai', `✅ ${response.message}`);
           onDiagramGenerated(response.updatedDiagram);
         } else {
+          console.error('❌ [CHATBOT] Error en modificación:', response.error);
           addMessage('ai', `❌ Error: ${response.error || 'No se pudo modificar el diagrama'}`);
         }
       } else if (intent === 'create') {
+        console.log('🆕 [CHATBOT] Modo: CREAR nuevo diagrama');
         // Crear nuevo diagrama
         const request: DiagramGenerationRequest = {
           description: userMessage,
@@ -201,25 +214,32 @@ const AIChatBot: React.FC<AIChatBotProps> = ({ onDiagramGenerated, currentDiagra
         const response: DiagramGenerationResponse = await AIService.generateDiagram(request);
 
         if (response.success && response.diagram) {
+          console.log('✅ [CHATBOT] Diagrama creado exitosamente');
           addMessage('ai', response.explanation || '✅ ¡Diagrama generado exitosamente!');
           onDiagramGenerated(response.diagram);
         } else {
+          console.error('❌ [CHATBOT] Error en creación:', response.error);
           addMessage('ai', `❌ Error: ${response.error || 'No se pudo generar el diagrama'}`);
         }
       } else {
+        console.log('💬 [CHATBOT] Modo: CHAT conversacional');
         // Chat conversacional
         const response = await AIService.sendMessage(userMessage, currentDiagram);
         
         if (response.success && response.response) {
+          console.log('✅ [CHATBOT] Respuesta de chat recibida');
           addMessage('ai', response.response);
         } else {
+          console.error('❌ [CHATBOT] Error en chat:', response.error);
           addMessage('ai', `❌ Error: ${response.error || 'No se pudo procesar el mensaje'}`);
         }
       }
     } catch (error) {
-  console.error('Error in chat:', error);
-  addMessage('ai', '❌ Error al comunicarse con la IA. Por favor, inténtalo de nuevo usando frases simples en español.');
+      console.error('❌ [CHATBOT] Error crítico en handleSubmit:', error);
+      console.error('❌ [CHATBOT] Stack trace:', error instanceof Error ? error.stack : 'No stack');
+      addMessage('ai', '❌ Error al comunicarse con la IA. Por favor, inténtalo de nuevo usando frases simples en español.');
     } finally {
+      console.log('🏁 [CHATBOT] Finalizando handleSubmit');
       setIsLoading(false);
     }
   }, [inputValue, isLoading, addMessage, onDiagramGenerated, currentDiagram]);
