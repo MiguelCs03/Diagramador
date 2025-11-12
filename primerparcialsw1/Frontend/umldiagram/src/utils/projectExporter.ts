@@ -523,31 +523,55 @@ For more information about the UML Diagram Tool, visit our documentation.
 }
 
 export async function exportAsZip(diagram: UMLDiagram, projectName?: string, packageName?: string): Promise<void> {
-  // Ask for PostgreSQL DB configuration before exporting
-  const dbName = typeof window !== 'undefined' ? (window.prompt('Nombre exacto de la base de datos (PostgreSQL):', 'mi_basedatos') || 'mi_basedatos') : 'mi_basedatos';
-  const dbUsername = typeof window !== 'undefined' ? (window.prompt('Usuario de PostgreSQL:', 'postgres') || 'postgres') : 'postgres';
-  const dbPassword = typeof window !== 'undefined' ? (window.prompt('Password de PostgreSQL:', 'postgres') || 'postgres') : 'postgres';
+  try {
+    // Validar que el diagrama tenga entidades
+    if (!diagram.entities || diagram.entities.length === 0) {
+      throw new Error('El diagrama no contiene entidades para exportar');
+    }
 
-  const exporter = new ProjectExporter(diagram, projectName, packageName, dbName, dbUsername, dbPassword);
-  const files = exporter.exportCompleteProject();
+    // Ask for PostgreSQL DB configuration before exporting
+    const dbName = typeof window !== 'undefined' ? (window.prompt('Nombre exacto de la base de datos (PostgreSQL):', 'mi_basedatos') || 'mi_basedatos') : 'mi_basedatos';
+    const dbUsername = typeof window !== 'undefined' ? (window.prompt('Usuario de PostgreSQL:', 'postgres') || 'postgres') : 'postgres';
+    const dbPassword = typeof window !== 'undefined' ? (window.prompt('Password de PostgreSQL:', 'postgres') || 'postgres') : 'postgres';
 
-  // Dynamic import of JSZip
-  const JSZip = (await import('jszip')).default;
-  const zip = new JSZip();
+    console.log('Iniciando exportación del proyecto...');
+    console.log('Diagrama:', diagram);
 
-  files.forEach((file) => {
-    zip.file(file.path, file.content);
-  });
+    const exporter = new ProjectExporter(diagram, projectName, packageName, dbName, dbUsername, dbPassword);
+    
+    console.log('Generando archivos del proyecto...');
+    const files = exporter.exportCompleteProject();
+    console.log(`Se generaron ${files.length} archivos`);
 
-  const content = await zip.generateAsync({ type: 'blob' });
-  const url = URL.createObjectURL(content);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${projectName || 'uml-generated-project'}.zip`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+    // Dynamic import of JSZip
+    console.log('Importando JSZip...');
+    const JSZip = (await import('jszip')).default;
+    const zip = new JSZip();
+
+    console.log('Agregando archivos al ZIP...');
+    files.forEach((file) => {
+      console.log(`Agregando: ${file.path}`);
+      zip.file(file.path, file.content);
+    });
+
+    console.log('Generando archivo ZIP...');
+    const content = await zip.generateAsync({ type: 'blob' });
+    
+    console.log('Descargando archivo...');
+    const url = URL.createObjectURL(content);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${projectName || 'uml-generated-project'}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    console.log('Exportación completada exitosamente');
+  } catch (error) {
+    console.error('Error durante la exportación:', error);
+    throw error;
+  }
 }
 
 export function exportDiagramAsJson(diagram: UMLDiagram): void {

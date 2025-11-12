@@ -320,12 +320,37 @@ const UMLDiagramApp: React.FC = () => {
   // Exportar proyecto Spring Boot
   const handleExportSpringBoot = useCallback(async () => {
     try {
+      // Validar que existan entidades antes de exportar
+      if (!diagram.entities || diagram.entities.length === 0) {
+        alert('No hay entidades en el diagrama para exportar. Por favor, crea al menos una entidad.');
+        return;
+      }
+
+      const classEntities = diagram.entities.filter(e => e.type === 'class' || e.type === 'abstract');
+      if (classEntities.length === 0) {
+        alert('No hay entidades de tipo clase o abstracta para exportar. Por favor, crea al menos una clase.');
+        return;
+      }
+
       const projectName = prompt('Nombre del proyecto:', diagram.name.replace(/\s+/g, '-').toLowerCase()) || 'uml-generated-project';
       const packageName = prompt('Nombre del paquete:', 'com.example.demo') || 'com.example.demo';
+      
+      console.log('Iniciando exportación de proyecto Spring Boot...');
       await exportAsZip(diagram, projectName, packageName);
+      
+      setNotification({
+        message: 'Proyecto Spring Boot exportado exitosamente',
+        type: 'success'
+      });
     } catch (error) {
       console.error('Error exporting Spring Boot project:', error);
-      alert('Error al exportar el proyecto Spring Boot. Verifica que jszip esté instalado.');
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      alert(`Error al exportar el proyecto Spring Boot:\n\n${errorMessage}\n\nVerifica que jszip esté instalado y que el diagrama esté correctamente definido.`);
+      
+      setNotification({
+        message: 'Error al exportar el proyecto Spring Boot',
+        type: 'error'
+      });
     }
   }, [diagram]);
 

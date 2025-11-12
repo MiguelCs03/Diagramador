@@ -30,7 +30,14 @@ const dartTypeMap: Record<string, string> = {
 };
 
 function toPascalCase(name: string) {
-    return name
+    // Normalizar caracteres especiales antes de procesar
+    const normalized = name
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/ñ/g, "n")
+        .replace(/Ñ/g, "N");
+    
+    return normalized
         .replace(/[_-]+/g, " ")
         .split(" ")
         .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
@@ -41,7 +48,12 @@ function toSnakeCase(name: string) {
     return name
         .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
         .replace(/[\s-]+/g, "_")
-        .toLowerCase();
+        .toLowerCase()
+        // Normalizar caracteres especiales (ñ -> n, á -> a, etc.)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/ñ/g, "n")
+        .replace(/Ñ/g, "n");
 }
 
 function mapDartType(type: string) {
@@ -50,6 +62,22 @@ function mapDartType(type: string) {
 
 function mapToDartType(type: string) {
     return dartTypeMap[type.toLowerCase()] ?? "String";
+}
+
+// Normalizar nombre de atributo para que sea válido en Dart
+function sanitizeAttributeName(name: string): string {
+    return name
+        // Normalizar caracteres con acentos
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        // Reemplazar ñ y Ñ
+        .replace(/ñ/g, "n")
+        .replace(/Ñ/g, "N")
+        // Eliminar cualquier carácter que no sea letra, número o guion bajo
+        .replace(/[^a-zA-Z0-9_]/g, "")
+        // Asegurar que empiece con letra minúscula (camelCase)
+        .replace(/^[^a-zA-Z]+/, "")
+        .replace(/^./, (char) => char.toLowerCase());
 }
 
 /* =========================
@@ -68,28 +96,55 @@ export function genModelDart(cls: UMLEntity): string {
     ];
     
     const fields = allAttributes
-        .map((a) => `  final ${mapDartType(a.type)}${a.name === 'id' ? '?' : ''} ${a.name};`)
+        .map((a) => {
+            const sanitizedName = sanitizeAttributeName(a.name);
+            return `  final ${mapDartType(a.type)}${a.name === 'id' ? '?' : ''} ${sanitizedName};`;
+        })
         .join("\n");
 
     // Parámetros del constructor con llaves para parámetros nombrados
     const params = allAttributes
-        .map((a) => a.name === 'id' ? `this.${a.name}` : `required this.${a.name}`)
+        .map((a) => {
+            const sanitizedName = sanitizeAttributeName(a.name);
+            return a.name === 'id' ? `this.${sanitizedName}` : `required this.${sanitizedName}`;
+        })
         .join(", ");
 
     // Generar fromJson con parámetros nombrados
     const fromJsonFields = allAttributes
         .map((a) => {
             const dartType = mapDartType(a.type);
+            const isNullable = a.name === 'id';
+            const sanitizedName = sanitizeAttributeName(a.name);
+            const jsonKey = a.name; // Mantener el nombre original para la clave JSON
+            
             if (dartType === 'int') {
-                return `      ${a.name}: json['${a.name}'],`;
+                if (isNullable) {
+                    return `      ${sanitizedName}: json['${jsonKey}'] != null ? json['${jsonKey}'] as int : null,`;
+                } else {
+                    return `      ${sanitizedName}: json['${jsonKey}'] as int? ?? 0,`;
+                }
             } else if (dartType === 'double') {
-                return `      ${a.name}: (json['${a.name}'] ?? 0.0).toDouble(),`;
+                if (isNullable) {
+                    return `      ${sanitizedName}: json['${jsonKey}'] != null ? (json['${jsonKey}'] as num).toDouble() : null,`;
+                } else {
+                    return `      ${sanitizedName}: json['${jsonKey}'] != null ? (json['${jsonKey}'] as num).toDouble() : 0.0,`;
+                }
             } else if (dartType === 'bool') {
-                return `      ${a.name}: json['${a.name}'] ?? false,`;
+                if (isNullable) {
+                    return `      ${sanitizedName}: json['${jsonKey}'] != null ? json['${jsonKey}'] as bool : null,`;
+                } else {
+                    return `      ${sanitizedName}: json['${jsonKey}'] as bool? ?? false,`;
+                }
             } else if (dartType === 'DateTime') {
-                return `      ${a.name}: json['${a.name}'] != null ? DateTime.parse(json['${a.name}']) : null,`;
+                return `      ${sanitizedName}: json['${jsonKey}'] != null ? DateTime.parse(json['${jsonKey}'] as String) : ${isNullable ? 'null' : 'DateTime.now()'},`;
             } else {
-                return `      ${a.name}: json['${a.name}'],`;
+                // String u otros tipos
+                if (isNullable) {
+                    return `      ${sanitizedName}: json['${jsonKey}'] != null ? json['${jsonKey}'] as String : null,`;
+                } else {
+                    return `      ${sanitizedName}: json['${jsonKey}'] as String? ?? '',`;
+                }
             }
         })
         .join("\n");
@@ -98,15 +153,22 @@ export function genModelDart(cls: UMLEntity): string {
     const toJsonFields = allAttributes
         .map((a) => {
             const dartType = mapDartType(a.type);
+            const sanitizedName = sanitizeAttributeName(a.name);
+            const jsonKey = a.name; // Mantener el nombre original para la clave JSON
+            
             if (dartType === 'DateTime') {
-                return `      '${a.name}': ${a.name}?.toIso8601String(),`;
+                return `      '${jsonKey}': ${sanitizedName} != null ? ${sanitizedName}!.toIso8601String() : null,`;
             } else {
-                return `      '${a.name}': ${a.name},`;
+                return `      '${jsonKey}': ${sanitizedName},`;
             }
         })
         .join("\n");
 
-    return `class ${className} {
+    // Determinar si necesitamos importar dart:convert (solo si hay DateTime)
+    const needsConvert = allAttributes.some(a => mapDartType(a.type) === 'DateTime');
+    const imports = needsConvert ? "import 'dart:convert';\n\n" : "";
+
+    return `${imports}class ${className} {
 ${fields}
 
   const ${className}({${params}});
@@ -273,8 +335,8 @@ class _${className}ListScreenState extends State<${className}ListScreen> {
             leading: CircleAvatar(
               child: Text('\${index + 1}'),
             ),
-            title: Text('${cls.attributes.length > 0 ? cls.attributes[0].name : "Item"}: \${item.${cls.attributes.length > 0 ? cls.attributes[0].name : "id"}}'),
-            subtitle: Text('${cls.attributes.length > 1 ? cls.attributes[1].name : "Info"}: \${item.${cls.attributes.length > 1 ? cls.attributes[1].name : cls.attributes.length > 0 ? cls.attributes[0].name : "id"}}'),
+            title: Text('${cls.attributes.length > 0 ? cls.attributes[0].name : "Item"}: \${item.${cls.attributes.length > 0 ? sanitizeAttributeName(cls.attributes[0].name) : "id"}}'),
+            subtitle: Text('${cls.attributes.length > 1 ? cls.attributes[1].name : "Info"}: \${item.${cls.attributes.length > 1 ? sanitizeAttributeName(cls.attributes[1].name) : cls.attributes.length > 0 ? sanitizeAttributeName(cls.attributes[0].name) : "id"}}'),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -404,23 +466,38 @@ export function genFormScreenDart(cls: UMLEntity): string {
     
     const controllerDeclarations = cls.attributes
         .filter((attr: UMLAttribute) => attr.name !== 'id')
-        .map((a: UMLAttribute) => `  final ${a.name}Controller = TextEditingController();`)
+        .map((a: UMLAttribute) => {
+            const sanitizedName = sanitizeAttributeName(a.name);
+            return `  final ${sanitizedName}Controller = TextEditingController();`;
+        })
         .join('\n');
     
     const disposeControllers = cls.attributes
         .filter((attr: UMLAttribute) => attr.name !== 'id')
-        .map((a: UMLAttribute) => `    ${a.name}Controller.dispose();`)
+        .map((a: UMLAttribute) => {
+            const sanitizedName = sanitizeAttributeName(a.name);
+            return `    ${sanitizedName}Controller.dispose();`;
+        })
         .join('\n');
     
     const initControllers = cls.attributes
         .filter((attr: UMLAttribute) => attr.name !== 'id')
-        .map((a: UMLAttribute) => `    ${a.name}Controller.text = widget.initialItem?.${a.name}?.toString() ?? '';`)
+        .map((a: UMLAttribute) => {
+            const dartType = mapToDartType(a.type);
+            const sanitizedName = sanitizeAttributeName(a.name);
+            if (dartType === 'DateTime') {
+                return `    ${sanitizedName}Controller.text = widget.initialItem?.${sanitizedName}?.toIso8601String() ?? '';`;
+            } else {
+                return `    ${sanitizedName}Controller.text = widget.initialItem?.${sanitizedName}?.toString() ?? '';`;
+            }
+        })
         .join('\n');
     
     const formFields = cls.attributes
         .filter((attr: UMLAttribute) => attr.name !== 'id')
         .map((attr: UMLAttribute) => {
             const dartType = mapToDartType(attr.type);
+            const sanitizedName = sanitizeAttributeName(attr.name);
             
             if (dartType === 'bool') {
                 return `
@@ -430,19 +507,39 @@ export function genFormScreenDart(cls: UMLEntity): string {
                 Text('${attr.name}:'),
                 SizedBox(width: 16),
                 Switch(
-                  value: ${attr.name}Value,
+                  value: ${sanitizedName}Value,
                   onChanged: (value) {
                     setState(() {
-                      ${attr.name}Value = value;
+                      ${sanitizedName}Value = value;
                     });
                   },
                 ),
               ],
             ),`;
+            } else if (dartType === 'DateTime') {
+                return `
+            TextFormField(
+              controller: ${sanitizedName}Controller,
+              decoration: InputDecoration(
+                labelText: '${attr.name} (YYYY-MM-DD)',
+                border: OutlineInputBorder(),
+                hintText: '2025-01-01',
+              ),
+              keyboardType: TextInputType.datetime,
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Por favor ingrese ${attr.name}';
+                }
+                if (DateTime.tryParse(value) == null) {
+                  return 'Formato de fecha inválido (YYYY-MM-DD)';
+                }
+                return null;
+              },
+            ),`;
             } else {
                 return `
             TextFormField(
-              controller: ${attr.name}Controller,
+              controller: ${sanitizedName}Controller,
               decoration: InputDecoration(
                 labelText: '${attr.name}',
                 border: OutlineInputBorder(),
@@ -461,28 +558,37 @@ export function genFormScreenDart(cls: UMLEntity): string {
     
     const booleanDeclarations = cls.attributes
         .filter((attr: UMLAttribute) => mapToDartType(attr.type) === 'bool')
-        .map((attr: UMLAttribute) => `  bool ${attr.name}Value = false;`)
+        .map((attr: UMLAttribute) => {
+            const sanitizedName = sanitizeAttributeName(attr.name);
+            return `  bool ${sanitizedName}Value = false;`;
+        })
         .join('\n');
     
     const booleanInits = cls.attributes
         .filter((attr: UMLAttribute) => mapToDartType(attr.type) === 'bool')
-        .map((attr: UMLAttribute) => `    ${attr.name}Value = widget.initialItem?.${attr.name} ?? false;`)
+        .map((attr: UMLAttribute) => {
+            const sanitizedName = sanitizeAttributeName(attr.name);
+            return `    ${sanitizedName}Value = widget.initialItem?.${sanitizedName} ?? false;`;
+        })
         .join('\n');
     
     const createObject = cls.attributes
         .map((attr: UMLAttribute) => {
+            const sanitizedName = sanitizeAttributeName(attr.name);
             if (attr.name === 'id') {
                 return `id: widget.initialItem?.id`;
             } else if (mapToDartType(attr.type) === 'bool') {
-                return `${attr.name}: ${attr.name}Value`;
+                return `${sanitizedName}: ${sanitizedName}Value`;
             } else {
                 const dartType = mapToDartType(attr.type);
                 if (dartType === 'int') {
-                    return `${attr.name}: int.tryParse(${attr.name}Controller.text)`;
+                    return `${sanitizedName}: int.tryParse(${sanitizedName}Controller.text) ?? 0`;
                 } else if (dartType === 'double') {
-                    return `${attr.name}: double.tryParse(${attr.name}Controller.text)`;
+                    return `${sanitizedName}: double.tryParse(${sanitizedName}Controller.text) ?? 0.0`;
+                } else if (dartType === 'DateTime') {
+                    return `${sanitizedName}: DateTime.tryParse(${sanitizedName}Controller.text) ?? DateTime.now()`;
                 } else {
-                    return `${attr.name}: ${attr.name}Controller.text`;
+                    return `${sanitizedName}: ${sanitizedName}Controller.text`;
                 }
             }
         })
@@ -637,11 +743,14 @@ export function genDetailScreenDart(cls: UMLEntity): string {
   const detailFields = cls.attributes
     .map((attr: UMLAttribute) => {
       const dartType = mapToDartType(attr.type);
+      const sanitizedName = sanitizeAttributeName(attr.name);
       let displayValue;
       if (dartType === 'bool') {
-        displayValue = `item.${attr.name} ? 'Sí' : 'No'`;
+        displayValue = `item.${sanitizedName} != null ? (item.${sanitizedName}! ? 'Sí' : 'No') : 'N/A'`;
+      } else if (dartType === 'DateTime') {
+        displayValue = `item.${sanitizedName} != null ? item.${sanitizedName}!.toIso8601String().split('T')[0] : 'N/A'`;
       } else {
-        displayValue = `item.${attr.name}?.toString() ?? 'N/A'`;
+        displayValue = `item.${sanitizedName} != null ? item.${sanitizedName}.toString() : 'N/A'`;
       }
       return `
       _buildDetailRow('${attr.name}', ${displayValue}),`;

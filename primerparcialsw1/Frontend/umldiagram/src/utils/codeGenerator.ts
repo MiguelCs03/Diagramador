@@ -19,15 +19,30 @@ export class SpringBootCodeGenerator {
   generateAll(): GeneratedFile[] {
     const files: GeneratedFile[] = [];
 
-    // Filter only class entities (exclude intermediate tables)
-    const classEntities = this.diagram.entities.filter(entity => 
-      entity.type === 'class' || entity.type === 'abstract'
-    );
+    try {
+      console.log('Iniciando generación de código Spring Boot...');
+      console.log('Total de entidades en diagrama:', this.diagram.entities.length);
 
-    // --- NUEVO: Preprocesar relaciones para agregar atributos inversos ---
-    // Creamos un mapa de entidades para fácil acceso
-    const entityMap: Record<string, UMLEntity> = {};
-    classEntities.forEach(e => { entityMap[e.id] = e; });
+      // Validar que existan entidades
+      if (!this.diagram.entities || this.diagram.entities.length === 0) {
+        throw new Error('No hay entidades en el diagrama para generar código');
+      }
+
+      // Filter only class entities (exclude intermediate tables)
+      const classEntities = this.diagram.entities.filter(entity => 
+        entity.type === 'class' || entity.type === 'abstract'
+      );
+
+      console.log('Entidades de tipo clase/abstracta:', classEntities.length);
+
+      if (classEntities.length === 0) {
+        throw new Error('No hay entidades de tipo clase o abstracta para generar código');
+      }
+
+      // --- NUEVO: Preprocesar relaciones para agregar atributos inversos ---
+      // Creamos un mapa de entidades para fácil acceso
+      const entityMap: Record<string, UMLEntity> = {};
+      classEntities.forEach(e => { entityMap[e.id] = e; });
 
     // Para cada relación relevante, si es OneToMany, aseguramos el ManyToOne en el destino
     this.diagram.relations.forEach((relation) => {
@@ -45,18 +60,14 @@ export class SpringBootCodeGenerator {
             target.attributes = target.attributes.filter(a => !(a.name === fieldName && a.type === 'Long'));
             const alreadyExists = target.attributes.some(a => a.name === fieldName && a.type === sourceClassName);
             if (!alreadyExists) {
+              // Agregar atributo con el nombre de la entidad como tipo
+              // El generador lo reconocerá como una relación ManyToOne
               target.attributes.push({
                 id: `rel-${source.id}-${target.id}`,
                 name: fieldName,
-                type: ((): DataType => {
-                  const allowed: DataType[] = [
-                    'String', 'Integer', 'Long', 'Double', 'Float', 'Boolean', 'Date', 'DateTime', 'BigDecimal', 'UUID', 'Text'
-                  ];
-                  if (allowed.includes(sourceClassName as DataType)) {
-                    return sourceClassName as DataType;
-                  }
-                  throw new Error(`Invalid DataType: ${sourceClassName}`);
-                })(), // Esto hará que el generador de campos cree un ManyToOne real
+                // Usar el nombre de la clase como tipo (será detectado como entidad relacionada)
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                type: sourceClassName as any,
                 visibility: 'private',
                 isKey: false
               });
@@ -65,19 +76,30 @@ export class SpringBootCodeGenerator {
       }
     });
 
-    // Generate files for each class entity
-    classEntities.forEach((entity) => {
-      files.push(this.generateEntity(entity));
-      files.push(this.generateRepository(entity));
-      files.push(this.generateService(entity));
-      files.push(this.generateController(entity));
-      files.push(this.generateDTO(entity));
-    });
+      // Generate files for each class entity
+      classEntities.forEach((entity) => {
+        try {
+          console.log(`Generando archivos para entidad: ${entity.name}`);
+          files.push(this.generateEntity(entity));
+          files.push(this.generateRepository(entity));
+          files.push(this.generateService(entity));
+          files.push(this.generateController(entity));
+          files.push(this.generateDTO(entity));
+        } catch (error) {
+          console.error(`Error generando archivos para entidad ${entity.name}:`, error);
+          throw new Error(`Error al generar código para la entidad "${entity.name}": ${error instanceof Error ? error.message : 'Error desconocido'}`);
+        }
+      });
 
-    // 2. LLAMADA AL NUEVO MÉTODO PARA GENERAR EL ARCHIVO CORS GLOBAL
-    files.push(this.generateCorsConfig());
+      // 2. LLAMADA AL NUEVO MÉTODO PARA GENERAR EL ARCHIVO CORS GLOBAL
+      files.push(this.generateCorsConfig());
 
-    return files;
+      console.log(`Generación completada: ${files.length} archivos generados`);
+      return files;
+    } catch (error) {
+      console.error('Error en generateAll():', error);
+      throw error;
+    }
   }
 
   private generateEntity(entity: UMLEntity): GeneratedFile {
@@ -148,8 +170,13 @@ export class SpringBootCodeGenerator {
 
     // Generate attributes
     entity.attributes.filter(attr => attr.name.toLowerCase() !== 'id').forEach((attr) => {
-      const related = this.diagram.entities.find(e => e.name.toLowerCase() === attr.type.toLowerCase());
-      if (related && related.type !== 'intermediate') {
+      // Verificar si el tipo del atributo es una entidad relacionada
+      const related = this.diagram.entities.find(e => 
+        e.name.toLowerCase() === attr.type.toLowerCase() && 
+        (e.type === 'class' || e.type === 'abstract')
+      );
+      
+      if (related) {
         // Attribute references another entity: generate ManyToOne instead of scalar field
         const fieldName = attr.name;
         const joinCol = `${this.toSnakeCase(fieldName)}_id`;
@@ -157,20 +184,32 @@ export class SpringBootCodeGenerator {
         content += `
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "${joinCol}")
+    @Schema(description = "Related ${related.name}")
     private ${this.capitalize(related.name)} ${fieldName};
 `;
       } else {
-        const javaType = this.mapDataType(attr.type);
-        const example = this.sampleValueForType(attr.type, this.capitalize(entity.name), attr.name);
-        const columnAnnotation = attr.isKey && attr.name !== 'id' 
-          ? `@Column(name = "${this.toSnakeCase(attr.name)}", unique = true)`
-          : `@Column(name = "${this.toSnakeCase(attr.name)}")`;
-        
-        content += `
+        // Es un tipo primitivo o no reconocido
+        try {
+          const javaType = this.mapDataType(attr.type);
+          const example = this.sampleValueForType(attr.type, this.capitalize(entity.name), attr.name);
+          const columnAnnotation = attr.isKey && attr.name !== 'id' 
+            ? `@Column(name = "${this.toSnakeCase(attr.name)}", unique = true)`
+            : `@Column(name = "${this.toSnakeCase(attr.name)}")`;
+          
+          content += `
     ${columnAnnotation}
     @Schema(description = "${attr.name} field", example = "${example}")
     private ${javaType} ${attr.name};
 `;
+        } catch (error) {
+          console.error(`Error processing attribute ${attr.name} with type ${attr.type}:`, error);
+          // Usar String como fallback
+          content += `
+    @Column(name = "${this.toSnakeCase(attr.name)}")
+    @Schema(description = "${attr.name} field")
+    private String ${attr.name};
+`;
+        }
       }
     });
 
@@ -583,6 +622,16 @@ public class CorsConfig {
       case 'UUID':
         return 'UUID';
       default:
+        // Si no es un tipo primitivo conocido, verificar si es una entidad
+        const relatedEntity = this.diagram.entities.find(
+          e => e.name.toLowerCase() === dataType.toLowerCase()
+        );
+        if (relatedEntity) {
+          // Es una referencia a otra entidad, devolver el nombre capitalizado
+          return this.capitalize(relatedEntity.name);
+        }
+        // Si no es reconocido, usar String por defecto
+        console.warn(`Unknown data type: ${dataType}, defaulting to String`);
         return 'String';
     }
   }
@@ -613,6 +662,16 @@ public class CorsConfig {
 
   // Example values for Swagger schema examples
   private sampleValueForType(type: string, entityName: string, attrName: string): string {
+    // Verificar si es una entidad relacionada
+    const relatedEntity = this.diagram.entities.find(
+      e => e.name.toLowerCase() === type.toLowerCase()
+    );
+    
+    if (relatedEntity) {
+      // Para entidades relacionadas, no usar en ejemplos de Swagger
+      return '1'; // ID de ejemplo
+    }
+    
     switch (type) {
       case 'String':
       case 'Text':
@@ -645,14 +704,24 @@ public class CorsConfig {
     const entries = entity.attributes
       .filter(a => a.name.toLowerCase() !== 'id')
       .map(a => {
-        const related = this.diagram.entities.find(e => e.name.toLowerCase() === a.type.toLowerCase());
-        if (related && related.type !== 'intermediate') {
+        const related = this.diagram.entities.find(e => 
+          e.name.toLowerCase() === a.type.toLowerCase() && 
+          (e.type === 'class' || e.type === 'abstract')
+        );
+        
+        if (related) {
           // For relations, show only foreign key id reference
           return `"${a.name}Id": 1`;
         }
-        const val = this.sampleValueForType(a.type, this.capitalize(entity.name), a.name);
-        const needsQuotes = !(['Integer','Long','Double','Float','Boolean','BigDecimal'].includes(a.type));
-        return needsQuotes ? `"${a.name}": "${val}"` : `"${a.name}": ${val}`;
+        
+        try {
+          const val = this.sampleValueForType(a.type, this.capitalize(entity.name), a.name);
+          const needsQuotes = !(['Integer','Long','Double','Float','Boolean','BigDecimal'].includes(a.type));
+          return needsQuotes ? `"${a.name}": "${val}"` : `"${a.name}": ${val}`;
+        } catch (error) {
+          console.error(`Error building example for attribute ${a.name}:`, error);
+          return `"${a.name}": "example_value"`;
+        }
       });
     return `{${entries.join(', ')}}`;
   }
